@@ -3,15 +3,15 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use activitypub_federation::{config::Data, traits::Object};
+use activitypub_federation::{config::Data, protocol::public_key::PublicKey, traits::Object};
 use diesel::{
     Connection, ExpressionMethods, PgConnection, QueryDsl, RunQueryDsl, SelectableHelper,
 };
 use dotenvy::dotenv;
 use url::Url;
 
-use crate::models::DbUser;
 use crate::person;
+use crate::{models::DbUser, person::Person};
 
 pub type DatabaseHandle = Arc<Database>;
 
@@ -63,11 +63,32 @@ impl Object for DbUser {
         object_id: Url,
         data: &Data<Self::DataType>,
     ) -> Result<Option<Self>, Self::Error> {
-        todo!();
+        let mut lock = data.db_conn.lock().unwrap();
+        let obj_as_str = object_id.as_str();
+        use crate::schema::users::dsl::*;
+
+        let result = users
+            .filter(id.eq(obj_as_str))
+            .select(DbUser::as_select())
+            .first(&mut *lock);
+
+        match result {
+            Ok(r) => Ok(Some(r)),
+            Err(e) => Err(anyhow::Error::new(e)),
+        }
     }
 
     async fn into_json(self, data: &Data<Self::DataType>) -> Result<Self::Kind, Self::Error> {
-        todo!();
+        Ok(Person {
+            id: Url::parse(&self.id.to_string()).unwrap().into(),
+            kind: Default::default(),
+            preferred_username: self.display_name,
+            name: self.name,
+            inbox: Url::parse(&self.inbox).unwrap(),
+            outbox: Url::parse(&self.outbox).unwrap(),
+            public_key: todo!(), //self.public_key(),
+            idx: self.idx,
+        })
     }
 
     async fn verify(
