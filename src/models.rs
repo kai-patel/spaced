@@ -5,7 +5,6 @@ use diesel::prelude::*;
 #[diesel(table_name = crate::schema::users)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct DbUser {
-    pub id: i32,
     pub name: String,
     pub display_name: String,
     pub password_hash: Option<String>,
@@ -17,4 +16,6 @@ pub struct DbUser {
     pub public_key: String,
     pub private_key: Option<String>,
     pub last_refreshed_at: NaiveDateTime,
+    pub id: String,
+    pub idx: i32,
 }

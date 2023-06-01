@@ -1,8 +1,7 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
-    users (id) {
-        id -> Int4,
+    users (idx) {
         name -> Text,
         display_name -> Text,
         password_hash -> Nullable<Text>,
@@ -14,5 +13,7 @@ diesel::table! {
         public_key -> Text,
         private_key -> Nullable<Text>,
         last_refreshed_at -> Timestamptz,
+        id -> Text,
+        idx -> Int4,
     }
 }

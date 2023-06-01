@@ -17,4 +17,5 @@ pub struct Person {
     pub inbox: Url,
     pub outbox: Url,
     pub public_key: PublicKey,
+    pub idx: i32
 }
