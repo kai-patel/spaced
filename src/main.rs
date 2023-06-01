@@ -1,18 +1,26 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use serde::{Deserialize, Serialize};
+use url::Url;
+use activitypub_federation::{fetch::object_id::ObjectId, traits::tests::DbUser, protocol::public_key::PublicKey, kinds::actor::PersonType, config::FederationConfig};
 
-use axum::{routing, Router};
-
-#[tokio::main]
-async fn main() {
-    let app = Router::new().route("/", routing::get(handler));
-    let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 3000);
-
-    axum::Server::bind(&address)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all="camelCase")]
+struct Person {
+    id: ObjectId<DbUser>,
+    #[serde(rename="type")]
+    kind: PersonType,
+    preferred_username: String,
+    name: String,
+    inbox: Url,
+    outbox: Url,
+    public_key: PublicKey
 }
 
-async fn handler() -> &'static str {
-    "Hello world!"
+fn main() -> anyhow::Result<()> {
+    let db_conn = todo!();
+
+    let config = FederationConfig::builder()
+        .domain("0.0.0.0")
+        .app_data(db_conn)
+        .build()?;
+
 }
