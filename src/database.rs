@@ -4,7 +4,9 @@ use std::{
 };
 
 use activitypub_federation::{config::Data, traits::Object};
-use diesel::{Connection, PgConnection};
+use diesel::{
+    Connection, ExpressionMethods, PgConnection, QueryDsl, RunQueryDsl, SelectableHelper,
+};
 use dotenvy::dotenv;
 use url::Url;
 
@@ -34,9 +36,17 @@ impl Database {
         )
     }
 
-    #[allow(unused)]
-    pub async fn read_local_user(&self, name: &str) -> Result<DbUser, anyhow::Error> {
-        todo!();
+    pub async fn read_local_user(&self, query: &str) -> Result<DbUser, diesel::result::Error> {
+        use crate::schema::users::dsl::*;
+        let mut lock = self.db_conn.lock().unwrap();
+
+        let result = users
+            .filter(name.eq(query))
+            .limit(1)
+            .select(DbUser::as_select())
+            .first(&mut *lock);
+
+        result
     }
 }
 
