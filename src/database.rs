@@ -4,11 +4,11 @@ use std::{
 };
 
 use activitypub_federation::{config::Data, traits::Object};
-use chrono::NaiveDateTime;
 use diesel::{Connection, PgConnection};
 use dotenvy::dotenv;
 use url::Url;
 
+use crate::models::DbUser;
 use crate::person;
 
 pub type DatabaseHandle = Arc<Database>;
@@ -38,21 +38,6 @@ impl Database {
     pub async fn read_local_user(&self, name: &str) -> Result<DbUser, anyhow::Error> {
         todo!();
     }
-}
-
-pub struct DbUser {
-    pub id: i32,
-    pub name: String,
-    pub display_name: String,
-    pub password_hash: Option<String>,
-    pub email: Option<String>,
-    pub federation_id: Url,
-    pub inbox: Url,
-    pub outbox: Url,
-    pub local: bool,
-    pub public_key: String,
-    pub private_key: Option<String>,
-    pub last_refreshed_at: NaiveDateTime,
 }
 
 #[allow(unused)]

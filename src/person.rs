@@ -2,12 +2,12 @@ use activitypub_federation::{fetch::object_id::ObjectId, protocol::public_key::P
 use serde::{Serialize, Deserialize};
 use url::Url;
 
-use crate::database;
+use crate::models::DbUser;
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Person {
-    id: ObjectId<database::DbUser>,
+    id: ObjectId<DbUser>,
     #[serde(rename = "type")]
     kind: PersonType,
     preferred_username: String,
