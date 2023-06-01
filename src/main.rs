@@ -6,6 +6,8 @@ use axum::{self, routing};
 mod database;
 mod http;
 mod person;
+mod models;
+mod schema;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -20,6 +22,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app = axum::Router::new()
         .route("/user/:name", routing::get(http::http_get_user))
+        .route(".well-known/webfinger", routing::get(http::webfinger))
         .layer(FederationMiddleware::new(config));
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
