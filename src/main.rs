@@ -1,10 +1,19 @@
-use activitypub_federation::config::{Data, FederationConfig, FederationMiddleware};
-use std::{
-    net::SocketAddr,
-    sync::{Arc, Mutex},
+use activitypub_federation::{
+    axum::json::FederationJson,
+    config::{Data, FederationConfig, FederationMiddleware},
+    protocol::context::WithContext,
+    traits::Object,
+    FEDERATION_CONTENT_TYPE,
 };
+use std::{net::SocketAddr, sync::Arc};
 
-use axum::{self, extract::Path, http::HeaderMap, response::IntoResponse, routing};
+use axum::{
+    self,
+    extract::Path,
+    http::{HeaderMap, StatusCode},
+    response::IntoResponse,
+    routing,
+};
 
 mod database;
 mod person;
@@ -37,5 +46,14 @@ async fn http_get_user(
     header_map: HeaderMap,
     Path(name): Path<String>,
     data: Data<database::DatabaseHandle>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    let accept = header_map.get("accept").map(|v| v.to_str().unwrap());
+    if accept == Some(FEDERATION_CONTENT_TYPE) {
+        let Ok(db_user) = data.read_local_user(&name).await else { return Err(StatusCode::BAD_REQUEST) };
+        let Ok(json_user) = db_user.into_json(&data).await else { return Err(StatusCode::BAD_REQUEST) };
+
+        Ok(FederationJson(WithContext::new_default(json_user)))
+    } else {
+        Err(StatusCode::BAD_REQUEST)
+    }
 }
