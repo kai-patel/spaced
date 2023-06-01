@@ -1,26 +1,41 @@
-use serde::{Deserialize, Serialize};
-use url::Url;
-use activitypub_federation::{fetch::object_id::ObjectId, traits::tests::DbUser, protocol::public_key::PublicKey, kinds::actor::PersonType, config::FederationConfig};
+use activitypub_federation::config::{Data, FederationConfig, FederationMiddleware};
+use std::{
+    net::SocketAddr,
+    sync::{Arc, Mutex},
+};
 
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all="camelCase")]
-struct Person {
-    id: ObjectId<DbUser>,
-    #[serde(rename="type")]
-    kind: PersonType,
-    preferred_username: String,
-    name: String,
-    inbox: Url,
-    outbox: Url,
-    public_key: PublicKey
-}
+use axum::{self, extract::Path, http::HeaderMap, response::IntoResponse, routing};
 
-fn main() -> anyhow::Result<()> {
-    let db_conn = todo!();
+mod database;
+mod person;
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let database = database::Database::new();
+    let db_handler = Arc::new(database);
 
     let config = FederationConfig::builder()
         .domain("0.0.0.0")
-        .app_data(db_conn)
+        .app_data(db_handler)
+        .debug(true)
         .build()?;
 
+    let app = axum::Router::new()
+        .route("/user/:name", routing::get(http_get_user))
+        .layer(FederationMiddleware::new(config));
+
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await?;
+
+    Ok(())
+}
+
+async fn http_get_user(
+    header_map: HeaderMap,
+    Path(name): Path<String>,
+    data: Data<database::DatabaseHandle>,
+) -> impl IntoResponse {
 }
