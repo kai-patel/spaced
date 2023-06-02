@@ -3,6 +3,7 @@ use std::{net::SocketAddr, sync::Arc};
 
 use axum::{self, routing};
 
+mod follow;
 mod database;
 mod http;
 mod person;
