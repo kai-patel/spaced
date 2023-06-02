@@ -1,6 +1,5 @@
 use activitypub_federation::{fetch::object_id::ObjectId, kinds::activity::FollowType, traits::ActivityHandler, config::Data};
 use async_trait::async_trait;
-use diesel::QueryDsl;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -29,10 +28,12 @@ impl ActivityHandler for Follow {
         self.actor.inner()
     }
 
+    #[allow(unused)]
     async fn verify(&self, data: &Data<Self::DataType>) -> Result<(), Self::Error> {
         Ok(())
     }
 
+    #[allow(unused)]
     async fn receive(self, data: &Data<Self::DataType>) -> Result<(), Self::Error> {
         let actor = self.actor.dereference(data).await?;
         let followed = self.object.dereference(data).await?;
