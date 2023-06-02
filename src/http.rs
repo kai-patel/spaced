@@ -24,7 +24,7 @@ pub async fn http_get_user(
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let accept = header_map.get("accept").map(|v| v.to_str().unwrap());
     if accept == Some(FEDERATION_CONTENT_TYPE) {
-        let Ok(db_user) = data.read_local_user(&name).await else { return Err(StatusCode::BAD_REQUEST) };
+        let Ok(db_user) = data.read_local_user(&name) else { return Err(StatusCode::BAD_REQUEST) };
         let Ok(json_user) = db_user.into_json(&data).await else { return Err(StatusCode::BAD_REQUEST) };
 
         Ok(FederationJson(WithContext::new_default(json_user)))
@@ -43,7 +43,7 @@ pub async fn webfinger(
     data: Data<database::DatabaseHandle>,
 ) -> Result<Json<Webfinger>, StatusCode> {
     let Ok(name) = extract_webfinger_name(&query.resource, &data) else { return Err(StatusCode::BAD_REQUEST) };
-    let Ok(db_user) = data.read_local_user(&name).await else { return Err(StatusCode::BAD_REQUEST) };
+    let Ok(db_user) = data.read_local_user(&name) else { return Err(StatusCode::BAD_REQUEST) };
     let Ok(federation_id) = Url::parse(&db_user.federation_id) else { return Err(StatusCode::NOT_FOUND) };
 
     Ok(Json(build_webfinger_response(

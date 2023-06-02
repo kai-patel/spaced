@@ -5,7 +5,7 @@ use std::{
 
 use activitypub_federation::{
     config::Data,
-    protocol::{public_key::PublicKey, verification::verify_domains_match},
+    protocol::verification::verify_domains_match,
     traits::{Actor, Object},
 };
 use chrono::Local;
@@ -41,15 +41,41 @@ impl Database {
         )
     }
 
-    pub async fn read_local_user(&self, query: &str) -> Result<DbUser, diesel::result::Error> {
+    pub fn read_local_user(&self, query: &str) -> Result<DbUser, diesel::result::Error> {
         use crate::schema::users::dsl::*;
         let mut lock = self.db_conn.lock().unwrap();
 
         let result = users
             .filter(name.eq(query))
-            .limit(1)
+            .filter(local.eq(true))
             .select(DbUser::as_select())
             .first(&mut *lock);
+
+        result
+    }
+
+    pub fn read_from_id(&self, query: &str) -> Result<DbUser, diesel::result::Error> {
+        use crate::schema::users::dsl::*;
+        let mut lock = self.db_conn.lock().unwrap();
+
+        let result = users
+            .filter(id.eq(query))
+            .select(DbUser::as_select())
+            .first(&mut *lock);
+
+        result
+    }
+
+    pub fn from_json(&self, input: &DbUser) -> Result<usize, diesel::result::Error> {
+        use crate::schema::users::dsl::*;
+        let mut lock = self.db_conn.lock().unwrap();
+
+        let result = diesel::insert_into(users)
+            .values(input)
+            .on_conflict(id)
+            .do_update()
+            .set(input)
+            .execute(&mut *lock);
 
         result
     }
@@ -70,15 +96,11 @@ impl Object for DbUser {
     ) -> Result<Option<Self>, Self::Error> {
         let mut lock = data.db_conn.lock().unwrap();
         let obj_as_str = object_id.as_str();
-        use crate::schema::users::dsl::*;
-
-        let result = users
-            .filter(id.eq(obj_as_str))
-            .select(DbUser::as_select())
-            .first(&mut *lock);
+        let result = data.read_from_id(obj_as_str);
 
         match result {
-            Ok(r) => Ok(Some(r)),
+            Ok(user) => Ok(Some(user)),
+            Err(diesel::result::Error::NotFound) => Ok(None),
             Err(e) => Err(anyhow::Error::new(e)),
         }
     }
@@ -104,12 +126,12 @@ impl Object for DbUser {
         let result = verify_domains_match(json.id.inner(), expected_domain);
         match result {
             Ok(r) => Ok(r),
-            Err(e) => Err(anyhow::Error::msg(e)),
+            Err(e) => Err(anyhow::Error::new(e)),
         }
     }
 
     async fn from_json(json: Self::Kind, data: &Data<Self::DataType>) -> Result<Self, Self::Error> {
-        Ok(DbUser {
+        let input = DbUser {
             name: json.name,
             display_name: json.preferred_username,
             password_hash: None,
@@ -123,7 +145,15 @@ impl Object for DbUser {
             last_refreshed_at: Local::now().naive_utc(),
             id: json.id.to_string(),
             idx: json.idx,
-        })
+        };
+
+        let result = data.from_json(&input);
+
+        match result {
+            Ok(1) => Ok(input),
+            Ok(_) => Err(anyhow::Error::msg("Database upserted more than one record")),
+            Err(e) => Err(anyhow::Error::new(e)),
+        }
     }
 }
 
