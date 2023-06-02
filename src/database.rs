@@ -4,6 +4,7 @@ use std::{
 };
 
 use activitypub_federation::{config::Data, protocol::public_key::PublicKey, traits::Object};
+use chrono::Local;
 use diesel::{
     Connection, ExpressionMethods, PgConnection, QueryDsl, RunQueryDsl, SelectableHelper,
 };
@@ -100,6 +101,20 @@ impl Object for DbUser {
     }
 
     async fn from_json(json: Self::Kind, data: &Data<Self::DataType>) -> Result<Self, Self::Error> {
-        todo!();
+        Ok(DbUser {
+            name: json.name,
+            display_name: json.preferred_username,
+            password_hash: None,
+            email: None,
+            federation_id: "".to_string(),
+            inbox: json.inbox.to_string(),
+            outbox: json.outbox.to_string(),
+            local: false,
+            public_key: todo!(),
+            private_key: todo!(),
+            last_refreshed_at: Local::now().naive_utc(),
+            id: json.id.to_string(),
+            idx: json.idx,
+        })
     }
 }
