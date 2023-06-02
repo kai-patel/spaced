@@ -3,7 +3,11 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use activitypub_federation::{config::Data, protocol::public_key::PublicKey, traits::Object};
+use activitypub_federation::{
+    config::Data,
+    protocol::public_key::PublicKey,
+    traits::{Actor, Object},
+};
 use chrono::Local;
 use diesel::{
     Connection, ExpressionMethods, PgConnection, QueryDsl, RunQueryDsl, SelectableHelper,
@@ -83,11 +87,11 @@ impl Object for DbUser {
         Ok(Person {
             id: Url::parse(&self.id.to_string()).unwrap().into(),
             kind: Default::default(),
-            preferred_username: self.display_name,
-            name: self.name,
+            preferred_username: self.display_name.clone(),
+            name: self.name.clone(),
             inbox: Url::parse(&self.inbox).unwrap(),
             outbox: Url::parse(&self.outbox).unwrap(),
-            public_key: todo!(), //self.public_key(),
+            public_key: self.public_key(),
             idx: self.idx,
         })
     }
@@ -116,5 +120,23 @@ impl Object for DbUser {
             id: json.id.to_string(),
             idx: json.idx,
         })
+    }
+}
+
+impl Actor for DbUser {
+    fn id(&self) -> Url {
+        Url::parse(&self.id).unwrap()
+    }
+
+    fn public_key_pem(&self) -> &str {
+        &self.public_key
+    }
+
+    fn private_key_pem(&self) -> Option<String> {
+        self.private_key.clone()
+    }
+
+    fn inbox(&self) -> Url {
+        Url::parse(&self.inbox).unwrap()
     }
 }
