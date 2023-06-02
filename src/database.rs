@@ -5,7 +5,7 @@ use std::{
 
 use activitypub_federation::{
     config::Data,
-    protocol::public_key::PublicKey,
+    protocol::{public_key::PublicKey, verification::verify_domains_match},
     traits::{Actor, Object},
 };
 use chrono::Local;
@@ -21,7 +21,7 @@ use crate::{models::DbUser, person::Person};
 pub type DatabaseHandle = Arc<Database>;
 
 pub struct Database {
-    db_conn: Mutex<PgConnection>,
+    pub db_conn: Mutex<PgConnection>,
 }
 
 impl Database {
@@ -101,7 +101,11 @@ impl Object for DbUser {
         expected_domain: &Url,
         data: &Data<Self::DataType>,
     ) -> Result<(), Self::Error> {
-        todo!();
+        let result = verify_domains_match(json.id.inner(), expected_domain);
+        match result {
+            Ok(r) => Ok(r),
+            Err(e) => Err(anyhow::Error::msg(e)),
+        }
     }
 
     async fn from_json(json: Self::Kind, data: &Data<Self::DataType>) -> Result<Self, Self::Error> {
