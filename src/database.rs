@@ -45,39 +45,33 @@ impl Database {
         use crate::schema::users::dsl::*;
         let mut lock = self.db_conn.lock().unwrap();
 
-        let result = users
+        users
             .filter(name.eq(query))
             .filter(local.eq(true))
             .select(DbUser::as_select())
-            .first(&mut *lock);
-
-        result
+            .first(&mut *lock)
     }
 
     pub fn read_from_id(&self, query: &str) -> Result<DbUser, diesel::result::Error> {
         use crate::schema::users::dsl::*;
         let mut lock = self.db_conn.lock().unwrap();
 
-        let result = users
+        users
             .filter(id.eq(query))
             .select(DbUser::as_select())
-            .first(&mut *lock);
-
-        result
+            .first(&mut *lock)
     }
 
     pub fn from_json(&self, input: &DbUser) -> Result<usize, diesel::result::Error> {
         use crate::schema::users::dsl::*;
         let mut lock = self.db_conn.lock().unwrap();
 
-        let result = diesel::insert_into(users)
+        diesel::insert_into(users)
             .values(input)
             .on_conflict(id)
             .do_update()
             .set(input)
-            .execute(&mut *lock);
-
-        result
+            .execute(&mut *lock)
     }
 }
 
@@ -107,7 +101,7 @@ impl Object for DbUser {
 
     async fn into_json(self, data: &Data<Self::DataType>) -> Result<Self::Kind, Self::Error> {
         Ok(Person {
-            id: Url::parse(&self.id.to_string()).unwrap().into(),
+            id: Url::parse(&self.id).unwrap().into(),
             kind: Default::default(),
             preferred_username: self.display_name.clone(),
             name: self.name.clone(),
