@@ -1729,6 +1729,7 @@ dependencies = [
  "chrono",
  "diesel",
  "dotenvy",
+ "hyper",
  "serde",
  "tokio",
  "tower",
