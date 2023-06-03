@@ -1722,6 +1722,7 @@ name = "spaced"
 version = "0.1.0"
 dependencies = [
  "activitypub_federation",
+ "actix-rt",
  "anyhow",
  "async-trait",
  "axum",
@@ -1730,6 +1731,7 @@ dependencies = [
  "dotenvy",
  "serde",
  "tokio",
+ "tower",
  "url",
 ]
 

@@ -1,5 +1,6 @@
 use activitypub_federation::config::{FederationConfig, FederationMiddleware};
 use database::{Database, DatabaseHandle, DatabaseTrait};
+use dotenvy::dotenv;
 use models::DbUser;
 use std::net::SocketAddr;
 
@@ -18,12 +19,14 @@ where
 {
     axum::Router::new()
         .route("/user/:name", routing::get(http::http_get_user))
-        .route(".well-known/webfinger", routing::get(http::webfinger))
+        .route("/.well-known/webfinger", routing::get(http::webfinger))
         .layer(FederationMiddleware::new(config))
 }
 
-#[tokio::main]
+#[actix_rt::main]
 async fn main() -> anyhow::Result<()> {
+    dotenv()?;
+
     let database: Database = Database::new();
     let db_handler: DatabaseHandle<Database> = DatabaseHandle::new(database);
 
@@ -49,6 +52,11 @@ mod tests {
     use std::sync::Mutex;
 
     use crate::database::DbHandler;
+    use axum::{
+        body::Body,
+        http::{Request, StatusCode},
+    };
+    use tower::ServiceExt;
 
     use super::*;
 
@@ -115,7 +123,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[actix_rt::test]
     async fn get_user() {
         let database: DB = DB {
             db_conn: Default::default(),
@@ -131,7 +139,17 @@ mod tests {
             .unwrap();
 
         let app = app::<DatabaseHandle<DB>, DbUser, anyhow::Error>(config);
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .header("accept", "application/activity+json")
+                    .uri("https://mastodon.social/@LemmyDev")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
 
-        todo!();
+        assert_ne!(response.status(), StatusCode::OK);
     }
 }
