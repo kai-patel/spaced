@@ -22,7 +22,7 @@ where
         .route("/:name", routing::get(http::http_get_user))
         .route("/.well-known/webfinger", routing::get(http::webfinger))
         .route("/ping", routing::get(http::http_ping))
-        .layer(FederationMiddleware::new(config.clone()))
+        .layer(FederationMiddleware::new(config))
 }
 
 #[actix_rt::main]
