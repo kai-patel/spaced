@@ -25,6 +25,7 @@ pub struct Database {
 pub trait DatabaseTrait<T, U> {
     fn read_local_user(&self, query: &str) -> Result<T, U>;
     fn read_from_id(&self, query: &str) -> Result<T, U>;
+    #[allow(clippy::wrong_self_convention)]
     fn from_json(&self, input: &DbUser) -> Result<usize, U>;
 }
 
@@ -32,7 +33,6 @@ pub trait DbHandler<T> {
     fn db_conn(&self) -> &Mutex<T>;
 }
 
-// #[derive(Clone)]
 pub struct DatabaseHandle<T>(Arc<T>);
 
 impl<T> DatabaseHandle<T> {
@@ -46,7 +46,6 @@ impl Clone for DatabaseHandle<Database> {
         Self(self.0.clone())
     }
 }
-// pub type DatabaseHandle = Arc<Database>;
 
 impl Database {
     pub fn new() -> Self {
@@ -63,6 +62,12 @@ impl Database {
             PgConnection::establish(&database_url)
                 .unwrap_or_else(|_| panic!("Could not connect to database")),
         )
+    }
+}
+
+impl Default for Database {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -189,6 +194,7 @@ impl DatabaseTrait<DbUser, diesel::result::Error> for DatabaseHandle<Database> {
             .first(&mut *lock)
     }
 
+    #[allow(clippy::wrong_self_convention)]
     fn from_json(&self, input: &DbUser) -> Result<usize, diesel::result::Error> {
         use crate::schema::users::dsl::*;
         let binding = self.db_conn();
