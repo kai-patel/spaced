@@ -1,9 +1,14 @@
-use activitypub_federation::{fetch::object_id::ObjectId, kinds::activity::FollowType, traits::ActivityHandler, config::Data};
+use activitypub_federation::{
+    config::Data, fetch::object_id::ObjectId, kinds::activity::FollowType, traits::ActivityHandler,
+};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::{models::DbUser, database::DatabaseHandle};
+use crate::{
+    database::{Database, DatabaseHandle},
+    models::DbUser,
+};
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +22,7 @@ pub struct Follow {
 
 #[async_trait]
 impl ActivityHandler for Follow {
-    type DataType = DatabaseHandle;
+    type DataType = DatabaseHandle<Database>;
     type Error = anyhow::Error;
 
     fn id(&self) -> &Url {
@@ -37,8 +42,6 @@ impl ActivityHandler for Follow {
     async fn receive(self, data: &Data<Self::DataType>) -> Result<(), Self::Error> {
         let actor = self.actor.dereference(data).await?;
         let followed = self.object.dereference(data).await?;
-
-        let lock = data.db_conn.lock().unwrap();
 
         todo!();
         // use crate::schema::users::dsl::*;

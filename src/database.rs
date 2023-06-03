@@ -18,11 +18,35 @@ use url::Url;
 use crate::person;
 use crate::{models::DbUser, person::Person};
 
-pub type DatabaseHandle = Arc<Database>;
-
 pub struct Database {
     pub db_conn: Mutex<PgConnection>,
 }
+
+pub trait DatabaseTrait<T, U> {
+    fn read_local_user(&self, query: &str) -> Result<T, U>;
+    fn read_from_id(&self, query: &str) -> Result<T, U>;
+    fn from_json(&self, input: &DbUser) -> Result<usize, U>;
+}
+
+pub trait DbHandler<T> {
+    fn db_conn(&self) -> &Mutex<T>;
+}
+
+// #[derive(Clone)]
+pub struct DatabaseHandle<T>(Arc<T>);
+
+impl<T> DatabaseHandle<T> {
+    pub fn new(db: T) -> Self {
+        DatabaseHandle(Arc::new(db))
+    }
+}
+
+impl Clone for DatabaseHandle<Database> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+// pub type DatabaseHandle = Arc<Database>;
 
 impl Database {
     pub fn new() -> Self {
@@ -40,45 +64,12 @@ impl Database {
                 .unwrap_or_else(|_| panic!("Could not connect to database")),
         )
     }
-
-    pub fn read_local_user(&self, query: &str) -> Result<DbUser, diesel::result::Error> {
-        use crate::schema::users::dsl::*;
-        let mut lock = self.db_conn.lock().unwrap();
-
-        users
-            .filter(name.eq(query))
-            .filter(local.eq(true))
-            .select(DbUser::as_select())
-            .first(&mut *lock)
-    }
-
-    pub fn read_from_id(&self, query: &str) -> Result<DbUser, diesel::result::Error> {
-        use crate::schema::users::dsl::*;
-        let mut lock = self.db_conn.lock().unwrap();
-
-        users
-            .filter(id.eq(query))
-            .select(DbUser::as_select())
-            .first(&mut *lock)
-    }
-
-    pub fn from_json(&self, input: &DbUser) -> Result<usize, diesel::result::Error> {
-        use crate::schema::users::dsl::*;
-        let mut lock = self.db_conn.lock().unwrap();
-
-        diesel::insert_into(users)
-            .values(input)
-            .on_conflict(id)
-            .do_update()
-            .set(input)
-            .execute(&mut *lock)
-    }
 }
 
 #[allow(unused)]
 #[async_trait::async_trait]
 impl Object for DbUser {
-    type DataType = DatabaseHandle;
+    type DataType = DatabaseHandle<Database>;
 
     type Kind = person::Person;
 
@@ -88,7 +79,6 @@ impl Object for DbUser {
         object_id: Url,
         data: &Data<Self::DataType>,
     ) -> Result<Option<Self>, Self::Error> {
-        let mut lock = data.db_conn.lock().unwrap();
         let obj_as_str = object_id.as_str();
         let result = data.read_from_id(obj_as_str);
 
@@ -166,5 +156,49 @@ impl Actor for DbUser {
 
     fn inbox(&self) -> Url {
         Url::parse(&self.inbox).unwrap()
+    }
+}
+
+impl DbHandler<PgConnection> for DatabaseHandle<Database> {
+    fn db_conn(&self) -> &Mutex<PgConnection> {
+        &self.0.db_conn
+    }
+}
+
+impl DatabaseTrait<DbUser, diesel::result::Error> for DatabaseHandle<Database> {
+    fn read_local_user(&self, query: &str) -> Result<DbUser, diesel::result::Error> {
+        use crate::schema::users::dsl::*;
+        let binding = self.db_conn();
+        let mut lock = binding.lock().unwrap();
+
+        users
+            .filter(name.eq(query))
+            .filter(local.eq(true))
+            .select(DbUser::as_select())
+            .first(&mut *lock)
+    }
+
+    fn read_from_id(&self, query: &str) -> Result<DbUser, diesel::result::Error> {
+        use crate::schema::users::dsl::*;
+        let binding = self.db_conn();
+        let mut lock = binding.lock().unwrap();
+
+        users
+            .filter(id.eq(query))
+            .select(DbUser::as_select())
+            .first(&mut *lock)
+    }
+
+    fn from_json(&self, input: &DbUser) -> Result<usize, diesel::result::Error> {
+        use crate::schema::users::dsl::*;
+        let binding = self.db_conn();
+        let mut lock = binding.lock().unwrap();
+
+        diesel::insert_into(users)
+            .values(input)
+            .on_conflict(id)
+            .do_update()
+            .set(input)
+            .execute(&mut *lock)
     }
 }

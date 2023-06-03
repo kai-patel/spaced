@@ -15,12 +15,12 @@ use axum::{
 use serde::Deserialize;
 use url::Url;
 
-use crate::database;
+use crate::database::{DatabaseHandle, DatabaseTrait, Database};
 
 pub async fn http_get_user(
     header_map: HeaderMap,
     Path(name): Path<String>,
-    data: Data<database::DatabaseHandle>,
+    data: Data<DatabaseHandle<Database>>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let accept = header_map.get("accept").map(|v| v.to_str().unwrap());
     if accept == Some(FEDERATION_CONTENT_TYPE) {
@@ -40,7 +40,7 @@ pub struct WebfingerQuery {
 
 pub async fn webfinger(
     Query(query): Query<WebfingerQuery>,
-    data: Data<database::DatabaseHandle>,
+    data: Data<DatabaseHandle<Database>>,
 ) -> Result<Json<Webfinger>, StatusCode> {
     let Ok(name) = extract_webfinger_name(&query.resource, &data) else { return Err(StatusCode::BAD_REQUEST) };
     let Ok(db_user) = data.read_local_user(&name) else { return Err(StatusCode::BAD_REQUEST) };
