@@ -124,7 +124,7 @@ mod tests {
     }
 
     #[actix_rt::test]
-    async fn get_user() {
+    async fn get_absent_user() {
         let database: DB = DB {
             db_conn: Default::default(),
         };
@@ -144,6 +144,38 @@ mod tests {
                 Request::builder()
                     .header("accept", "application/activity+json")
                     .uri("https://mastodon.social/@LemmyDev")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_ne!(response.status(), StatusCode::OK);
+        let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+        assert_eq!(body, hyper::body::Bytes::from(""));
+    }
+
+    // #[actix_rt::test]
+    async fn webfinger() {
+        let database: DB = DB {
+            db_conn: Default::default(),
+        };
+
+        let db_handler: DatabaseHandle<DB> = DatabaseHandle::new(database);
+
+        let config = FederationConfig::builder()
+            .domain("0.0.0.0")
+            .app_data(db_handler)
+            .debug(true)
+            .build()
+            .unwrap();
+
+        let app = app::<DatabaseHandle<DB>, DbUser, anyhow::Error>(config);
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .header("accept", "*/*")
+                    .uri("https://0.0.0.0/.well-known/webfinger/?resource=acct:LemmyDev@mastodon.social")
                     .body(Body::empty())
                     .unwrap(),
             )
