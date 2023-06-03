@@ -3,6 +3,7 @@ use database::{Database, DatabaseHandle, DatabaseTrait};
 use dotenvy::dotenv;
 use models::DbUser;
 use std::net::SocketAddr;
+use tracing_subscriber::prelude::*;
 
 use axum::{self, routing};
 
@@ -18,14 +19,20 @@ where
     T: DatabaseTrait<U, V> + std::clone::Clone + std::marker::Sync + std::marker::Send + 'static,
 {
     axum::Router::new()
-        .route("/user/:name", routing::get(http::http_get_user))
+        .route("/:name", routing::get(http::http_get_user))
         .route("/.well-known/webfinger", routing::get(http::webfinger))
-        .layer(FederationMiddleware::new(config))
+        .route("/ping", routing::get(http::http_ping))
+        .layer(FederationMiddleware::new(config.clone()))
 }
 
 #[actix_rt::main]
 async fn main() -> anyhow::Result<()> {
     dotenv()?;
+
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::new("spaced=debug"))
+        .with(tracing_subscriber::fmt::layer())
+        .init();
 
     let database: Database = Database::new();
     let db_handler: DatabaseHandle<Database> = DatabaseHandle::new(database);
@@ -38,11 +45,15 @@ async fn main() -> anyhow::Result<()> {
 
     let app = app::<DatabaseHandle<Database>, DbUser, diesel::result::Error>(config);
 
+    tracing::debug!("app created");
+
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
 
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await?;
+    let server = axum::Server::bind(&addr).serve(app.into_make_service());
+
+    tracing::debug!("listening on {}:{}", addr.ip(), addr.port());
+
+    server.await?;
 
     Ok(())
 }
@@ -50,6 +61,7 @@ async fn main() -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use std::sync::Mutex;
+    use tower_http::trace::TraceLayer;
 
     use crate::database::DbHandler;
     use axum::{
@@ -132,31 +144,35 @@ mod tests {
         let db_handler: DatabaseHandle<DB> = DatabaseHandle::new(database);
 
         let config = FederationConfig::builder()
-            .domain("0.0.0.0")
+            .domain("localhost")
             .app_data(db_handler)
             .debug(true)
             .build()
             .unwrap();
 
-        let app = app::<DatabaseHandle<DB>, DbUser, anyhow::Error>(config);
+        let app = app::<DatabaseHandle<DB>, DbUser, anyhow::Error>(config)
+            .layer(TraceLayer::new_for_http());
+
         let response = app
             .oneshot(
                 Request::builder()
-                    .header("accept", "application/activity+json")
-                    .uri("https://mastodon.social/@LemmyDev")
+                    .header("Accept", "application/activity+json")
+                    .uri("/fakeuser/")
                     .body(Body::empty())
                     .unwrap(),
             )
             .await
             .unwrap();
 
-        assert_ne!(response.status(), StatusCode::OK);
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
         let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+        println!("body: {:?}", body);
         assert_eq!(body, hyper::body::Bytes::from(""));
     }
 
-    // #[actix_rt::test]
-    async fn webfinger() {
+    #[actix_rt::test]
+    async fn absent_webfinger() {
         let database: DB = DB {
             db_conn: Default::default(),
         };
@@ -164,26 +180,66 @@ mod tests {
         let db_handler: DatabaseHandle<DB> = DatabaseHandle::new(database);
 
         let config = FederationConfig::builder()
-            .domain("0.0.0.0")
+            .domain("localhost")
             .app_data(db_handler)
             .debug(true)
             .build()
             .unwrap();
 
-        let app = app::<DatabaseHandle<DB>, DbUser, anyhow::Error>(config);
+        let app = app::<DatabaseHandle<DB>, DbUser, anyhow::Error>(config)
+            .layer(TraceLayer::new_for_http());
+
         let response = app
             .oneshot(
                 Request::builder()
                     .header("accept", "*/*")
-                    .uri("https://0.0.0.0/.well-known/webfinger/?resource=acct:LemmyDev@mastodon.social")
+                    .uri("/.well-known/webfinger/?resource=acct:LemmyDev@mastodon.social")
                     .body(Body::empty())
                     .unwrap(),
             )
             .await
             .unwrap();
 
-        assert_ne!(response.status(), StatusCode::OK);
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
         let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+        println!("body: {:?}", body);
         assert_eq!(body, hyper::body::Bytes::from(""));
+    }
+
+    #[actix_rt::test]
+    async fn ping() {
+        let database: DB = DB {
+            db_conn: Default::default(),
+        };
+
+        let db_handler: DatabaseHandle<DB> = DatabaseHandle::new(database);
+
+        let config = FederationConfig::builder()
+            .domain("localhost")
+            .app_data(db_handler)
+            .debug(true)
+            .build()
+            .unwrap();
+
+        let app = app::<DatabaseHandle<DB>, DbUser, anyhow::Error>(config)
+            .layer(TraceLayer::new_for_http());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .header("accept", "*/*")
+                    .uri("/ping")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+        println!("body: {:?}", body);
+        assert_eq!(body, hyper::body::Bytes::from("pong"));
     }
 }
