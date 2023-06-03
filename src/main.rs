@@ -45,4 +45,93 @@ async fn main() -> anyhow::Result<()> {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use std::sync::Mutex;
+
+    use crate::database::DbHandler;
+
+    use super::*;
+
+    struct DB {
+        pub db_conn: Mutex<Box<Vec<DbUser>>>,
+    }
+
+    impl DbHandler<Box<Vec<DbUser>>> for DatabaseHandle<DB> {
+        fn db_conn(&self) -> &Mutex<Box<Vec<DbUser>>> {
+            &self.0.db_conn
+        }
+    }
+
+    impl Clone for DatabaseHandle<DB> {
+        fn clone(&self) -> Self {
+            Self(self.0.clone())
+        }
+    }
+
+    impl DatabaseTrait<DbUser, anyhow::Error> for DatabaseHandle<DB> {
+        fn read_local_user(&self, query: &str) -> Result<DbUser, anyhow::Error> {
+            let lock = self.db_conn().lock().unwrap();
+
+            for user in lock.iter() {
+                if user.name == query && user.local {
+                    return Ok(user.clone());
+                }
+            }
+
+            Err(anyhow::Error::msg("Could not find user"))
+        }
+
+        fn read_from_id(&self, query: &str) -> Result<DbUser, anyhow::Error> {
+            let lock = self.db_conn().lock().unwrap();
+
+            for user in lock.iter() {
+                if user.id == query {
+                    return Ok(user.clone());
+                }
+            }
+
+            Err(anyhow::Error::msg("Could not find user"))
+        }
+
+        fn from_json(&self, input: &DbUser) -> Result<usize, anyhow::Error> {
+            let mut lock = self.db_conn().lock().unwrap();
+
+            let mut total = 0;
+            let new = input.clone();
+
+            for i in 0..lock.len() {
+                let user = &lock[i];
+                if user.id == input.id {
+                    lock[i] = DbUser { ..new.clone() };
+                    total += 1;
+                }
+            }
+
+            if total > 0 {
+                Ok(total)
+            } else {
+                Err(anyhow::Error::msg("Error"))
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn get_user() {
+        let database: DB = DB {
+            db_conn: Default::default(),
+        };
+
+        let db_handler: DatabaseHandle<DB> = DatabaseHandle::new(database);
+
+        let config = FederationConfig::builder()
+            .domain("0.0.0.0")
+            .app_data(db_handler)
+            .debug(true)
+            .build()
+            .unwrap();
+
+        let app = app::<DatabaseHandle<DB>, DbUser, anyhow::Error>(config);
+
+        todo!();
+    }
+}

@@ -33,7 +33,7 @@ pub trait DbHandler<T> {
     fn db_conn(&self) -> &Mutex<T>;
 }
 
-pub struct DatabaseHandle<T>(Arc<T>);
+pub struct DatabaseHandle<T>(pub Arc<T>);
 
 impl<T> DatabaseHandle<T> {
     pub fn new(db: T) -> Self {
